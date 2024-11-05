@@ -1,10 +1,10 @@
 # bartCausePy
 
-A Python wrapper of [bartCause](https://github.com/vdorie/bartCause)(Causal Inference using Bayesian Additive Regression Trees) authored by [Vincent Dorie](https://github.com/vdorie/bartCause). 
+A Python wrapper of bartCause(Causal Inference using Bayesian Additive Regression Trees) authored by [Vincent Dorie](https://github.com/vdorie/bartCause). 
 
 ![teaser.png](teaser.png)
 
-#### Requirements
+## Requirements
 
 * Python>=3.8
 * rpy2>=3.5.0
@@ -12,7 +12,7 @@ A Python wrapper of [bartCause](https://github.com/vdorie/bartCause)(Causal Infe
 * pandas>=2.0.0
 * scikit-learn>=1.3.2
 
-#### Get Started
+## Get Started
 
 ```
 git clone https://github.com/yanmluk/bartCausePy.git
