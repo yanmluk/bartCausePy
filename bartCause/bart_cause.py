@@ -36,6 +36,30 @@ class BARTCause:
           #colMeans(res) 
           return(list(y_pred = colMeans(res), lb = res_lower, ub = res_upper))        
         }
+                   
+        inclusion_prop <- function(bart_machine, n_samples){
+          bart_response_fit <- bart_machine$fit.rsp
+                   
+          # Extract variable inclusion counts
+          varcount_matrix <- bart_response_fit$varcount
+                   
+          # Sum varcounts(inclusion counts) across the first two dimensions (chains and samples)
+          total_varcount <- apply(varcount_matrix, 3, sum)
+        
+          # Compute the percentage of use for each variable(inclusion counts/total number of splits)
+          percent_vars <- varcount_matrix / total_varcount
+          percent_vars <- percent_vars *n_samples
+                   
+          # Collapse the first two dimensions (chains and samples) to compute mean percentage
+          # Use 'aperm' to adjust dimensions for 'apply'
+          collapsed_percent_vars <- aperm(percent_vars, c(3, 1, 2))
+          res <- apply(collapsed_percent_vars, 1, mean)
+          # remove non-covariates
+          res$z <- NULL
+          res$ps <- NULL
+                        
+          res
+        }
 
         ''')
 
@@ -43,6 +67,7 @@ class BARTCause:
         self._r_train = robjects.globalenv['bart_train']
         self._r_fit_res =  robjects.globalenv['fit_res']
         self._r_predict_res =  robjects.globalenv['predict_res']
+        self._r_inclusion_prop =  robjects.globalenv['inclusion_prop']
 
         # enable R to read numpy objects
         rpy2.robjects.numpy2ri.activate()
@@ -61,13 +86,14 @@ class BARTCause:
         # convert to numpy arrays
         X = convert_and_expand(X)
         Z = convert_and_expand(Z)
-        try:
-            y = y.astype(float)
-        except:
-            raise TypeError("y must be a continuous array.")
+        # try:
+        #     y = y.astype(float)
+        # except:
+        #     raise TypeError("y must be a continuous array.")
         
         y = convert_to_numpy(y)
         self._bart_machine = self._r_train(y, Z, X, n_samples,  n_burn,  n_chains)
+        self._n_samples = n_samples
     
 
     def predict(self, newData, infer_type="ite"):
@@ -82,6 +108,8 @@ class BARTCause:
         Note:
             ite infers effect between of observed and estimated counterfactual while icate infers estimated factual and counterfactual.
         """
+        assert hasattr(self, "_bart_machine"), "Did not fit the BART model"
+
         if infer_type in ["y", "mu", "mu.1", "mu.0", "y.1", "y.0"]:
             dfNewData = pd.DataFrame(newData, columns=([('V'+str(i)) for i in range(1,newData.shape[1])] + ['z']))
             res = self._r_predict_res(self._bart_machine, dfNewData, infer_type)
@@ -102,5 +130,20 @@ class BARTCause:
         Returns:
             fitted quantites.
         """
+        assert hasattr(self, "_bart_machine"), "Did not fit the BART model"
         return self._r_fit_res(self._bart_machine, infer_type)
+    
+
+    def get_feature_importance(self):
+        """Get feature importance of covariates
+
+        Returns:
+            List of covariates' importance
+        """
+        assert hasattr(self, "_bart_machine"), "Did not fit the BART model"
+        assert hasattr(self, "_n_samples"), "BART has no attribute number of samples"
+        feature_importance_list = [item[0] for item in self._r_inclusion_prop(self._bart_machine, self._n_samples)] 
+
+        return feature_importance_list
+
 
