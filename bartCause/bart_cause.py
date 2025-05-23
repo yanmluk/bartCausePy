@@ -83,13 +83,16 @@ class BARTCause:
             y: target to predict.
             Z: Treatment column(law)
         """
-        # convert to numpy arrays
-        X = convert_and_expand(X)
-        Z = convert_and_expand(Z)
-        # try:
-        #     y = y.astype(float)
-        # except:
-        #     raise TypeError("y must be a continuous array.")
+        if isinstance(X, pd.core.frame.DataFrame):
+            pass
+        else:
+            # convert to numpy arrays
+            X = convert_and_expand(X)
+        if isinstance(Z, pd.core.frame.DataFrame): 
+            pass
+        else: 
+            # convert to numpy arrays
+            Z = convert_and_expand(Z)
         
         y = convert_to_numpy(y)
         self._bart_machine = self._r_train(y, Z, X, n_samples,  n_burn,  n_chains)
@@ -111,7 +114,11 @@ class BARTCause:
         assert hasattr(self, "_bart_machine"), "Did not fit the BART model"
 
         if infer_type in ["y", "mu", "mu.1", "mu.0", "y.1", "y.0"]:
-            dfNewData = pd.DataFrame(newData, columns=([('V'+str(i)) for i in range(1,newData.shape[1])] + ['z']))
+            if isinstance(newData, pd.core.frame.DataFrame):
+                dfNewData = newData.copy(deep=True)
+                dfNewData.rename(columns={newData.columns[-1]:'z'}, inplace=True)
+            else:
+                dfNewData = pd.DataFrame(newData, columns=([('V'+str(i)) for i in range(1,newData.shape[1])] + ['z']))
             res = self._r_predict_res(self._bart_machine, dfNewData, infer_type)
             return res[0], res[1], res[2]
         else:
@@ -142,8 +149,12 @@ class BARTCause:
         """
         assert hasattr(self, "_bart_machine"), "Did not fit the BART model"
         assert hasattr(self, "_n_samples"), "BART has no attribute number of samples"
-        feature_importance_list = [item[0] for item in self._r_inclusion_prop(self._bart_machine, self._n_samples)] 
+        feature_importance_obj = self._r_inclusion_prop(self._bart_machine, self._n_samples)
+        names = feature_importance_obj.names
+        feature_importance_dict = {}
+        for name in names:
+            feature_importance_dict[name] = feature_importance_obj.rx2(str(name))[0]
 
-        return feature_importance_list
+        return feature_importance_dict
 
 
